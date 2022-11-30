@@ -1,0 +1,38 @@
+# makefile to compile the protobuf C++ files and build library
+
+# First use Protobuf's protoc to generate .cc and .h files.
+# Copy this makefile to the directory where the generated .cc and .h files reside.
+
+CPP = c++
+CPP_FLAGS = -std=c++11 -Wall
+CPP_INCLUDE = -I/usr/local/include
+
+LINKER_FLAGS = -L/usr/local/lib -lprotobuf
+
+CPP_H = announcement.pb.h announcements.pb.h configuration.pb.h label.pb.h message.pb.h
+CPP_CC = $(CPP_H:h=cc)
+OBJS = $(CPP_H:h=o)
+
+%.o: %.cc
+	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -c $< 
+
+default:
+	@echo "makefile does not have a default target"
+
+lib: pa_protobuf.hpp pa_protobuf.a 
+
+pa_protobuf.hpp: $(CPP_H)
+	for f in ${CPP_H}; 			\
+	do            				\
+		echo \#include \"$$f\"; \
+	done > $@
+
+pa_protobuf.a: $(OBJS)
+	ar ru $@ $(OBJS)
+	ranlib $@
+
+clean:
+	rm -f $(OBJS)
+
+very_clean: clean
+	rm -f *.cc *.h *.hpp *.a
