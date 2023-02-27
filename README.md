@@ -44,7 +44,7 @@ The adapter can be compiled with a C++11 compiler, e.g., Clang or gcc.
 
 To compile the plugin adapter, the libraries *boost*, *protobuf*, *websocket++* and *spdlog* are expected to be installed globally. The makefile expects the include files of these libraries in /usr/local/include and the compiled libraries to be installed into /usr/local/lib. Furthermore, protobuf's `protoc` compiler should be installed.
 
-The distribution contains a makefile with two targets: 
+The source distribution in ./src contains a makefile with two targets: 
 
 * pa_protobuf_lib. This target calls the binary protoc compiler to generate support files for the Protobuf messages and compiles these C++ files into ./pa_protobuf, and creates the library ./pa_protobuf/pa_protobuf.a. It also creates the include file ../pa_protobuf/pa_protobuf.hpp which is included by the source files of the adapter.
 

@@ -1,0 +1,3 @@
+adapter
+src/pa_protobuf
+src/*.o

@@ -47,6 +47,7 @@ smartdoor_connection.o: smartdoor_connection.cpp smartdoor_connection.hpp
 
 adapter: adapter.cpp $(INCLUDES) $(OBJS)
 	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -o $@ $< $(OBJS) $(LINKER_FLAGS)
+	mv adapter ..
 
 all: pa_protobuf_lib adapter
 
