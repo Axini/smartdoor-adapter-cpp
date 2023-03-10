@@ -72,8 +72,3 @@ This C++ adapter has been built succesfully on macOS 11.7.1 (Big Sur), using:
 - Error handling should be improved upon.
 - Virtual stimuli to inject bad weather behavior have to be added.
 - (Unit) tests are missing.
-
-
-# License
-
-The source code of the adapter is distributed under the BSD License. See LICENSE.txt.
