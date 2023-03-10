@@ -1,5 +1,3 @@
-// Copyright 2023 Axini B.V. https://www.axini.com, see: LICENSE.txt.
-
 # Description
 
 This project defines a C++ implementation of a plugin adapter (PA) for Axini's standalone SmartDoor SUT. It connects the Axini Modeling Platform (AMP) to the standalone SmartDoor SUT. It has been developed to serve as an example implementation for the Axini Adapter Training.
@@ -9,6 +7,8 @@ Disclaimer: C++ is not the lingua franca at Axini. Without a doubt we will have 
 The organization and architecture of the C++ adapter is strongly based on Axini's Ruby plugin-adapter-api version 4.x and a similar Java implementation of a plugin adapter for the standalone SmartDoor SUT. 
 
 This is an initial version of the implementation; it is still work in progress.
+
+The software is distributed under the MIT license, see LICENSE.txt.
 
 
 # External libraries
