@@ -9,17 +9,17 @@ CPP_INCLUDE = -I/usr/local/include
 
 LINKER_FLAGS = -L/usr/local/lib -lprotobuf
 
-CPP_H = announcement.pb.h announcements.pb.h configuration.pb.h label.pb.h message.pb.h
+CPP_H = announcement.pb.h configuration.pb.h label.pb.h message.pb.h
 CPP_CC = $(CPP_H:h=cc)
 OBJS = $(CPP_H:h=o)
 
 %.o: %.cc
-	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -c $< 
+	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -c $<
 
 default:
 	@echo "makefile does not have a default target"
 
-lib: pa_protobuf.hpp pa_protobuf.a 
+lib: pa_protobuf.hpp pa_protobuf.a
 
 pa_protobuf.hpp: $(CPP_H)
 	for f in ${CPP_H}; 			\

@@ -14,7 +14,6 @@ pa_protobuf_lib:
 	mkdir -p $(PA_PROTOBUF_DIR)
 	cp -f $(MAKEFILE) $(PA_PROTOBUF_DIR)
 	$(PROTOC) $(PROTO_DIR)/announcement.proto
-	$(PROTOC) $(PROTO_DIR)/announcements.proto
 	$(PROTOC) $(PROTO_DIR)/configuration.proto
 	$(PROTOC) $(PROTO_DIR)/label.proto
 	$(PROTOC) $(PROTO_DIR)/message.proto
