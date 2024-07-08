@@ -5,8 +5,8 @@
 
 #include "handler.hpp"
 #include "smartdoor_handler.hpp"
-
 #include "pa_protobuf.hpp"
+
 using namespace PluginAdapter::Api;
 
 const std::string SMARTDOOR_URL          = "ws://localhost:3001";

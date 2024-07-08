@@ -1,13 +1,19 @@
 // Copyright 2023 Axini B.V. https://www.axini.com, see: LICENSE.txt.
 
+#include <iostream>
+
 #include "spdlog/spdlog.h"
 
 #include "adapter_core.hpp"
 #include "broker_connection.hpp"
 #include "axini_protobuf.hpp"
 
+using std::placeholders::_1;
 AdapterCore::AdapterCore(std::string name, BrokerConnection* broker_connection_ptr,
-                         Handler* handler_ptr) {
+                         Handler* handler_ptr)
+    : qthread_to_amp(std::bind(&AdapterCore::send_message_to_amp, this, _1)),
+      qthread_handle_message(std::bind(&AdapterCore::handle_message, this, _1))
+{
     this->adapter_name = name;
     this->broker_connection_ptr = broker_connection_ptr;
     this->handler_ptr = handler_ptr;
@@ -19,8 +25,11 @@ AdapterCore::~AdapterCore() {
     // not "own" the Handler, so we should *not* delete them.
 }
 
+// Start the adapter which will open a connection with AMP.
 void AdapterCore::start() {
     spdlog::info("AdapterCore::start");
+    clear_qthread_queues();
+
     if (state == DISCONNECTED) {
         spdlog::info("AdapterCore: connecting to AMP's broker.");
         broker_connection_ptr->connect();
@@ -31,6 +40,7 @@ void AdapterCore::start() {
     }
 }
 
+// Broker call back for when the connection is opened with AMP.
 void AdapterCore::on_open() {
     spdlog::info("AdapterCore::on_open");
 
@@ -43,7 +53,7 @@ void AdapterCore::on_open() {
         Announcement announcement =
             axini::announcement(adapter_name, labels, configuration);
         Message message = axini::message(announcement);
-        send_message(message);
+        queue_message_to_amp(message);
 
         state = ANNOUNCED;
 
@@ -54,10 +64,11 @@ void AdapterCore::on_open() {
     }
 }
 
-// BrokerConnection: connection is closed.
+// BrokerConnection: connection with AMP has been closed. Try to reconnect.
 // * stop the handler
 void AdapterCore::on_close(int code, std::string reason) {
     state = DISCONNECTED;
+    clear_qthread_queues();
 
     std::stringstream s;
     s << "AdapterCore: connection with AMP closed with code " << code
@@ -70,82 +81,44 @@ void AdapterCore::on_close(int code, std::string reason) {
     handler_ptr->stop();
 
     // reconnect to AMP - keep the adapter alive.
-    spdlog::info("AdapterCore: reconnecting to AMP.");
+    spdlog::info("AdapterCore: trying to reconnect to AMP.");
     start();
 }
 
-// Configuration received from AMP.
-// * configure the handler,
-// * start the handler,
-// * send ready to AMP (should be done by handler).
-void AdapterCore::on_configuration(Configuration configuration) {
-    spdlog::info("AdapterCore::on_configuration");
-
-    if (state == ANNOUNCED) {
-        handler_ptr->set_configuration(configuration);
-        state = CONFIGURED;
-
-        spdlog::info("AdapterCore: connecting to the SUT.");
-        handler_ptr->start();
-
-        // The handler should call send_ready() as it knows when it is ready.
-
-    } else {
-        std::string message = (state == CONNECTED) ?
-            "Configuration received from AMP while not yet announced." :
-            "Configuration received from AMP while already configured.";
-        spdlog::error(message);
-        send_error(message);
-    }
+// Add the msg from AMP to the queue to be handled by the QThread.
+void AdapterCore::handle_message_from_amp(std::string msg) {
+    spdlog::debug("Adding message from AMP to the QThread to be handled: " + msg);
+    qthread_handle_message.add(msg);
 }
 
-// Label (stimulus) received from AMP.
-// * make handler offer the stimulus to the SUT,
-// * acknowledge the actual stimulus to AMP.
+// Send response from the SUT to AMP (callback for Handler).
+// TODO: check whether the label is indeed a response.
+void AdapterCore::send_response(Label label, std::string physical_label,
+                                long timestamp) {
+    spdlog::info("AdapterCore::send_response (to AMP): " + axini::to_string(label));
+    Label new_label = axini::label(label, physical_label, timestamp);
+    Message message = axini::message(new_label);
+    queue_message_to_amp(message);
+}
+
+// Send Ready to AMP.
+void AdapterCore::send_ready() {
+    spdlog::info("AdapterCore::send_ready - send ready to AMP");
+    queue_message_to_amp(axini::message_ready());
+    state = READY;
+}
+
+// Confirm a received stimulus by sending it back to AMP.
 // TODO: check that the label is indeed a stimulus.
-void AdapterCore::on_label(Label label) {
-    std::string label_name = label.label();
-    spdlog::info("AdapterCore::on_label: " + label_name);
-
-    if (state == READY) {
-        spdlog::info("AdapterCore: forwarding label to Handler object");
-        long correlation_id = label.correlation_id();
-        std::string physical_label = handler_ptr->stimulate(label);
-        long timestamp = axini::current_timestamp();
-        send_stimulus(label, physical_label, timestamp, correlation_id);
-
-    } else {
-        std::string message = "AdapterCore: label received from AMP while *not* ready.";
-        spdlog::error(message);
-        send_error(message);
-    }
+void AdapterCore::send_stimulus_confirmation(Label confirmation) {
+    spdlog::info("AdapterCore::send_stimulus_confirmation (back to AMP): " +
+                    axini::to_string(confirmation));
+    Message message = axini::message(confirmation);
+    queue_message_to_amp(message);
 }
 
-// Reset message received from AMP.
-// * reset the handler,
-// * send ready to AMP (should be done by handler).
-void AdapterCore::on_reset() {
-    if (state == READY) {
-        spdlog::info("AdapterCore: resetting the connection with the SUT.");
-        handler_ptr->reset();
-        // The handler should call send_ready() as it knows when it is ready.
-
-    } else {
-        std::string message = "AdapterCore: reset received from AMP while *not* ready.";
-        spdlog::info(message);
-        send_error(message);
-    }
-}
-
-// Error message received from AMP.
-// * close the connection to AMP
-void AdapterCore::on_error(std::string message) {
-    state = ERROR;
-    std::string msg = "AdapterCore: error message received from AMP: " + message + ".";
-    spdlog::error(msg);
-    broker_connection_ptr->close(1000, message); // 1000 is normal closure...
-}
-
+// Handle the message from AMP: parse the message and call the
+// appropriate on_* method.
 void AdapterCore::handle_message(std::string msg) {
     spdlog::info("AdapterCore::handle_message");
 
@@ -191,47 +164,104 @@ void AdapterCore::handle_message(std::string msg) {
     }
 }
 
-// Send response to AMP (callback for Handler).
-// TODO: check whether the label is indeed a response.
-void AdapterCore::send_response(Label label, std::string physical_label,
-                                long timestamp) {
-    spdlog::info("AdapterCore::send_response (to AMP): " + axini::to_string(label));
-    Label new_label = axini::label(label, physical_label, timestamp);
-    Message message = axini::message(new_label);
-    send_message(message);
-}
+// Configuration received from AMP.
+// * configure the handler,
+// * start the handler,
+// * send ready to AMP (should be done by handler).
+void AdapterCore::on_configuration(Configuration configuration) {
+    spdlog::info("AdapterCore::on_configuration");
 
-// Send Ready to AMP
-void AdapterCore::send_ready() {
-    spdlog::info("AdapterCore::send_ready to AMP");
-    send_message(axini::message_ready());
-    state = READY;
-}
+    if (state == ANNOUNCED) {
+        handler_ptr->set_configuration(configuration);
+        state = CONFIGURED;
 
-void AdapterCore::send_message(Message message) {
-    // spdlog::info("AdapterCore::send_message");
-    std::string str;
-    if (!message.SerializeToString(&str)) {
-        spdlog::error("AdapterCore: failed to serialize ProtoBuf message.");
-        return; // TODO: should we throw an exeption
+        spdlog::info("AdapterCore: connecting to the SUT.");
+        handler_ptr->start();
+
+        // The handler should call send_ready() as it knows when it is ready.
+
+    } else {
+        std::string message = (state == CONNECTED) ?
+            "Configuration received from AMP while not yet announced." :
+            "Configuration received from AMP while already configured.";
+        spdlog::error(message);
+        send_error(message);
     }
-    broker_connection_ptr->send((void *) str.c_str(), message.ByteSizeLong());
 }
 
-// Acknowledge stimulus to AMP.
+// Label (stimulus) received from AMP.
+// * make handler offer the stimulus to the SUT,
+// * acknowledge the actual stimulus to AMP.
 // TODO: check that the label is indeed a stimulus.
-void AdapterCore::send_stimulus(Label label, std::string physical_label,
-                                long timestamp, long correlation_id) {
-    spdlog::info("AdapterCore::send_stimulus (back to AMP): " + axini::to_string(label));
-    Label new_label = axini::label(label, physical_label, timestamp, correlation_id);
-    Message message = axini::message(new_label);
-    send_message(message);
+void AdapterCore::on_label(Label label) {
+    std::string label_name = label.label();
+    spdlog::info("AdapterCore::on_label: " + label_name);
+
+    if (state == READY) {
+        spdlog::info("AdapterCore: forwarding label to Handler object");
+        std::string physical_label = handler_ptr->stimulate(label);
+
+    } else {
+        std::string message = "AdapterCore: label received from AMP while *not* ready.";
+        spdlog::error(message);
+        send_error(message);
+    }
+}
+
+// Reset message received from AMP.
+// * reset the handler,
+// * send ready to AMP (should be done by handler).
+void AdapterCore::on_reset() {
+    if (state == READY) {
+        spdlog::info("AdapterCore: resetting the connection with the SUT.");
+        clear_qthread_queues();
+        handler_ptr->reset();
+        // The handler should call send_ready() as it knows when it is ready.
+
+    } else {
+        std::string message = "AdapterCore: reset received from AMP while *not* ready.";
+        spdlog::info(message);
+        send_error(message);
+    }
+}
+
+// Error message received from AMP.
+// * close the connection to AMP
+void AdapterCore::on_error(std::string message) {
+    state = ERROR;
+    std::string msg = "AdapterCore: error message received from AMP: " + message + ".";
+    spdlog::error(msg);
+    broker_connection_ptr->close(1000, message); // 1000 is normal closure...
 }
 
 // Send Error message to AMP (also callback for Handler).
 void AdapterCore::send_error(std::string error_message) {
     spdlog::info("AdapterCore::send_error");
     Message message = axini::message_error(error_message);
-    send_message(message);
+    queue_message_to_amp(message);
     broker_connection_ptr->close(1000, error_message); // 1000 is normal closure
+}
+
+// Adds message to the queue of pending messages to AMP.
+void AdapterCore::queue_message_to_amp(Message message) {
+    spdlog::debug("Adding message to the QThread which sends messages to AMP");
+    qthread_to_amp.add(message);
+}
+
+// Send a Message to AMP.
+void AdapterCore::send_message_to_amp(Message message) {
+    spdlog::debug("AdapterCore::send_message_to_amp");
+    std::string str;
+    if (!message.SerializeToString(&str)) {
+        spdlog::error("AdapterCore: failed to serialize ProtoBuf message.");
+        return; // TODO: should we throw an exeption?
+    }
+    broker_connection_ptr->send((void *) str.c_str(), message.ByteSizeLong());
+}
+
+// Clear the queues of the QThread objects.
+void AdapterCore::clear_qthread_queues() {
+    spdlog::info("Clearing queues with pending messages.");
+    qthread_to_amp.clear_queue();
+    qthread_handle_message.clear_queue();
 }

@@ -69,6 +69,12 @@ void SmartDoorHandler::reset() {
 std::string SmartDoorHandler::stimulate(Label stimulus) {
     spdlog::info("SmartDoorHandler::stimulate: " + axini::to_string(stimulus));
     std::string sut_message = label_to_sut_message(stimulus);
+
+    long correlation_id = stimulus.correlation_id();
+    long timestamp = axini::current_timestamp();
+    Label confirmation = axini::label(stimulus, sut_message, timestamp, correlation_id);
+    adapter_core_ptr -> send_stimulus_confirmation(confirmation);
+
     smartdoor_connection_ptr->send(sut_message);
     return sut_message;
 }

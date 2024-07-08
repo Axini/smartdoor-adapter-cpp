@@ -134,7 +134,7 @@ void BrokerConnection::on_message(connection_hdl hdl, message_ptr msg) {
           << "text message received from AMP: " + msg->get_payload();
         spdlog::error(s.str());
     } else {
-        adapter_core_ptr->handle_message(msg->get_payload());
+        adapter_core_ptr->handle_message_from_amp(msg->get_payload());
     }
 }
 

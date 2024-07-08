@@ -4,6 +4,7 @@
 #define HANDLER_HPP
 
 #include "pa_protobuf.hpp"
+
 using namespace PluginAdapter::Api;
 
 class AdapterCore;
