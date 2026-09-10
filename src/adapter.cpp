@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    spdlog::info("Starting adapter: " + ADAPTER_NAME);
+    spdlog::info("Starting adapter: " + name);
     run_test(name, url, token);
 
     // Delete all global objects allocated by libprotobuf.

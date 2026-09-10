@@ -123,6 +123,7 @@ void BrokerConnection::on_fail(connection_hdl hdl) {
     connection_ptr con = m_endpoint.get_con_from_hdl(hdl);
     std::string msg = con->get_ec().message();
     spdlog::error("Error message: " + msg);
+    spdlog::error("Underlying transport error: " + con->get_transport_ec().message());
 }
 
 void BrokerConnection::on_message(connection_hdl hdl, message_ptr msg) {

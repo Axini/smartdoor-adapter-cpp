@@ -10,7 +10,6 @@ This is still an early version of the implementation; it is still work in progre
 
 The software is distributed under the MIT license, see LICENSE.txt.
 
-
 # External libraries
 
 The adapter uses several libraries from external parties.
@@ -42,35 +41,51 @@ spdlog is a header-only (or compiled), C++ logging library.
 
 # Compilation of the plugin-adapter
 
-The adapter can be compiled with a C++ 17 compiler, e.g., Clang or gcc. 
+This project targets Ubuntu Linux. The adapter can be compiled with a C++ 17 compiler, e.g., gcc or Clang.
 
-To compile the plugin adapter, the libraries *boost*, *protobuf*, *websocket++* and *spdlog* are expected to be installed globally. The makefile expects the include files of these libraries either in `/usr/local/include` and the compiled libraries to be installed into `/usr/local/lib`, or in the specific directories of the installed libraries. Furthermore, protobuf's `protoc` compiler should be installed.
+To compile the plugin adapter, the libraries *boost*, *protobuf*, *websocket++* and *spdlog* are expected to be installed globally. The Makefile expects the include files and compiled libraries of these libraries to be installed into the standard system locations (`/usr/include` and `/usr/lib/<arch>`). Furthermore, protobuf's `protoc` compiler should be installed.
 
-The source distribution in `./src` contains a `makefile` with the target 'all': 
+## Installing dependencies on Ubuntu
+
+```bash
+sudo apt install build-essential libboost-dev libprotobuf-dev protobuf-compiler \
+    libssl-dev libwebsocketpp-dev libspdlog-dev libfmt-dev
 ```
-$ make all
+
+Known good versions on Ubuntu 24.04 (Noble): boost 1.83, protobuf 3.21.12, websocketpp 0.8.2, spdlog 1.12.0, fmt 9.1.0.
+
+The root of this project contains a `Makefile` with the target 'all':
+
+```bash
+make all
 ```
+
 This will will generate all necessary C++ Protobuf files, will compile all 
-C++ files and will build the plugin-adapter executable as `../build/adapter`.
+C++ files and will build the plugin-adapter executable as `./build/adapter`.
 
 The plugin-adapter expects three arguments:
-```
-../build/adapter <name> <url> <token>
-```
-where `<name>` is the name of the apdater (will be shown in AMP's adapter page),
-`<url>` is the Websocket URL of AMP, and `<token>` the adapter token.
 
-When using the default configuration, the adapter expects the standalone SmartDoor SUT to run locally and listening to port 3001.
+```bash
+./build/adapter <name> <url> <token>
+
+```
+where `<name>` is the name of the apdater (will be shown in AMP's adapter page), `<url>` is the Websocket URL of AMP, and `<token>` the API key obtained in AMP.
+
+Alternatively use the convenience script.
+
+```bash
+./adapter
+```
 
 ## Versions used
 
-This C++ adapter has been built succesfully on macOS 13.6.6 (Ventura) on an Intel MacBook Pro, using:
+This C++ adapter has been built succesfully on Ubuntu 24.04 (Noble), using:
 
-    Apple Clang C++ version 15.0.0 (using C++ version 17)
-    boost 1.85.0 
-    protobuf 21.11
+    gcc C++ version 13 (using C++ version 17)
+    boost 1.83
+    protobuf 3.21.12
     WebSocket++ 0.8.2
-    spdlog 1.14.1
+    spdlog 1.12.0
 
 
 # Current limitations
