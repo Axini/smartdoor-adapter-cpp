@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Convenience script to start the SmartDoor adapter.
+
+BINARY=./build/adapter
+
+HOSTNAME=$(hostname)
+NAME=smartdoor-adapter-cpp@${HOSTNAME}
+URL=
+TOKEN=
+
+$BINARY $NAME $URL $TOKEN

@@ -1,36 +1,28 @@
-# makefile for the C++ implementation of the SmartDoor adapter
+# Makefile for the C++ implementation of the SmartDoor adapter
 
 default:
-	@echo "makefile does not have a default target"
+	@echo "Makefile does not have a default target"
 
-GENERIC_DIR   = ./generic
-SMARTDOOR_DIR = ./smartdoor
-BUILD_DIR     = ../build
+GENERIC_DIR   = ./src/generic
+SMARTDOOR_DIR = ./src/smartdoor
+BUILD_DIR     = ./build
 
 # directories that make will search for source files
 VPATH = $(GENERIC_DIR)/:$(SMARTDOOR_DIR)/:$(BUILD_DIR)/
 
 # ----- third-party directories
 
-# Google protobuf 21 and OpenSSL 3 are *not* installed globally.
-
-# directory where protobuf 21 is installed
-GOOGLE_PROTOBUF_DIR = /usr/local/opt/protobuf@21
-
-# directory where OpenSSL 3 is installed
-OPEN_SSL_DIR = /usr/local/opt/openssl@3
+# On Ubuntu (e.g. via apt), protobuf and OpenSSL headers/libs are installed
+# into the standard system locations, so no extra -I/-L flags are needed.
+PROTOC_BIN = protoc
 
 # ----- C++ settings
 
 CPP = c++
 CPP_FLAGS = -std=c++17 -Wall
-CPP_INCLUDE = -I$(GOOGLE_PROTOBUF_DIR)/include \
-			  -I$(OPEN_SSL_DIR)/include \
-			  -I$(BUILD_DIR) -I$(GENERIC_DIR) -I$(SMARTDOOR_DIR)
+CPP_INCLUDE = -I$(BUILD_DIR) -I$(GENERIC_DIR) -I$(SMARTDOOR_DIR)
 
-LINKER_FLAGS = -L$(OPEN_SSL_DIR)/lib -lssl -lcrypto \
-			   -L$(GOOGLE_PROTOBUF_DIR)/lib -lprotobuf \
-			   -L/usr/local/lib -lfmt
+LINKER_FLAGS = -lssl -lcrypto -lprotobuf -lfmt
 
 $(BUILD_DIR)/%.o: %.cc
 	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -o $@ -c $<
@@ -40,8 +32,8 @@ $(BUILD_DIR)/%.o: %.cpp
 
 # ----- generate protobuf C++ files and build pa_protobuf.a
 
-PROTO_DIR = proto
-PROTOC = $(GOOGLE_PROTOBUF_DIR)/bin/protoc -I$(PROTO_DIR) --cpp_out=$(BUILD_DIR)
+PROTO_DIR = src/proto
+PROTOC = $(PROTOC_BIN) -I$(PROTO_DIR) --cpp_out=$(BUILD_DIR)
 
 PROTOS = announcement.proto configuration.proto label.proto message.proto
 PA_CPP_H  = ${patsubst %.proto,$(BUILD_DIR)/%.pb.h,$(PROTOS)}
@@ -76,8 +68,8 @@ $(BUILD_DIR)/smartdoor_handler.o: smartdoor_handler.cpp smartdoor_handler.hpp \
 $(BUILD_DIR)/smartdoor_connection.o: smartdoor_connection.cpp \
 	smartdoor_connection.hpp smartdoor_handler.cpp
 
-$(BUILD_DIR)/adapter: adapter.cpp $(INCLUDES) $(BUILD_DIR)/pa_protobuf.a $(BUILD_OBJS)
-	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -o $@ $< $(LINKER_FLAGS) $(BUILD_OBJS) $(BUILD_DIR)/pa_protobuf.a
+$(BUILD_DIR)/adapter: src/adapter.cpp $(INCLUDES) $(BUILD_DIR)/pa_protobuf.a $(BUILD_OBJS)
+	$(CPP) $(CPP_FLAGS) $(CPP_INCLUDE) -o $@ $< $(BUILD_OBJS) $(BUILD_DIR)/pa_protobuf.a $(LINKER_FLAGS)
 
 all: $(BUILD_DIR)/adapter
 
@@ -101,10 +93,10 @@ THIS_DATE=`date`
 THIS_COMMIT=`git rev-parse --short HEAD`
 
 VERSION.txt:
-	@echo "Version of this smartdoor-cpp adapter: " > $@
+	@echo "Version of this smartdoor-adapter-cpp adapter: " > $@
 	@echo "- created on: ${THIS_DATE}" >> $@
 	@echo "- latest git revision: ${THIS_COMMIT}" >> $@
 
 zip: very_clean VERSION.txt
-	pushd ../..; $(ZIP) $(ZIP_OPTIONS) $(ZIP_NAME) smartdoor-cpp; popd
+	pushd ..; $(ZIP) $(ZIP_OPTIONS) $(ZIP_NAME) smartdoor-adapter-cpp; popd
 	rm -f VERSION.txt
